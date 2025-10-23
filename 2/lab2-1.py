@@ -30,10 +30,13 @@ def make_pp_plot(values: pd.Series, title: str, suffix: str) -> Path:
     sorted_values = np.sort(values.to_numpy())
     mean = sorted_values.mean()
     std = sorted_values.std(ddof=0)
-    if std == 0:
-        std = 1e-9  # Защита от деления на ноль при константном ряду.
+    std = std or 1e-9  # Защита от деления на ноль при константном ряду.
     # Вычисляем квантильные уровни для эмпирических данных.
-    empirical_probs = np.linspace(1 / (len(sorted_values) + 1), len(sorted_values) / (len(sorted_values) + 1), len(sorted_values))
+    empirical_probs = np.linspace(
+        1 / (len(sorted_values) + 1),
+        len(sorted_values) / (len(sorted_values) + 1),
+        len(sorted_values),
+    )
     # Теоретические вероятности нормального распределения на тех же значениях.
     standardized = (sorted_values - mean) / std
     theoretical_probs = stats.norm.cdf(standardized)
@@ -64,7 +67,9 @@ def make_qq_plot(values: pd.Series, title: str, suffix: str) -> Path:
     return plot_path
 
 
-def plot_hist_with_statistics(values: pd.Series, title: str, suffix: str) -> tuple[Path, float, float, float]:
+def plot_hist_with_statistics(
+    values: pd.Series, title: str, suffix: str
+) -> tuple[Path, float, float, float]:
     """Строим гистограмму и отмечаем моду, медиану и среднее."""
     mean = values.mean()
     median = values.median()
@@ -72,9 +77,19 @@ def plot_hist_with_statistics(values: pd.Series, title: str, suffix: str) -> tup
 
     plt.figure(figsize=(10, 6))
     plt.hist(values, bins=10, color="skyblue", edgecolor="black", alpha=0.7)
-    plt.axvline(mode, color="purple", linestyle="-", linewidth=2, label=f"Мода: {mode:.4f}")
-    plt.axvline(median, color="green", linestyle="--", linewidth=2, label=f"Медиана: {median:.4f}")
-    plt.axvline(mean, color="red", linestyle=":", linewidth=2, label=f"Среднее: {mean:.4f}")
+    plt.axvline(
+        mode, color="purple", linestyle="-", linewidth=2, label=f"Мода: {mode:.4f}"
+    )
+    plt.axvline(
+        median,
+        color="green",
+        linestyle="--",
+        linewidth=2,
+        label=f"Медиана: {median:.4f}",
+    )
+    plt.axvline(
+        mean, color="red", linestyle=":", linewidth=2, label=f"Среднее: {mean:.4f}"
+    )
     plt.title(f"Гистограмма курса: {title} ({suffix})")
     plt.xlabel("Курс")
     plt.ylabel("Частота")
@@ -94,12 +109,14 @@ def run_normality_tests(values: pd.Series) -> dict:
     result["shapiro"] = (shapiro_stat, shapiro_p)
 
     anderson_res = stats.anderson(values, dist="norm")
-    result["anderson"] = (anderson_res.statistic, list(zip(anderson_res.significance_level, anderson_res.critical_values)))
+    result["anderson"] = (
+        anderson_res.statistic,
+        list(zip(anderson_res.significance_level, anderson_res.critical_values)),
+    )
 
     mean = values.mean()
     std = values.std(ddof=0)
-    if std == 0:
-        std = 1e-9
+    std = std or 1e-9
     ks_stat, ks_p = stats.kstest(values, "norm", args=(mean, std))
     result["kolmogorov"] = (ks_stat, ks_p)
     return result
@@ -132,19 +149,25 @@ def analyze_currency(df: pd.DataFrame, name: str) -> pd.Series:
 
     tests = run_normality_tests(values)
     shapiro_stat, shapiro_p = tests["shapiro"]
-    print(f"Критерий Шапиро-Уилка: статистика={shapiro_stat:.4f}, p-value={shapiro_p:.4f}")
+    print(
+        f"Критерий Шапиро-Уилка: статистика={shapiro_stat:.4f}, p-value={shapiro_p:.4f}"
+    )
     anderson_stat, anderson_table = tests["anderson"]
     print(f"Критерий Андерсона-Дарлинга: статистика={anderson_stat:.4f}")
     for level, critical in anderson_table:
         print(f"  Уровень значимости {level:.1f}%: критическое значение {critical:.4f}")
     ks_stat, ks_p = tests["kolmogorov"]
-    print(f"Критерий Колмогорова-Смирнова: статистика={ks_stat:.4f}, p-value={ks_p:.4f}")
+    print(
+        f"Критерий Колмогорова-Смирнова: статистика={ks_stat:.4f}, p-value={ks_p:.4f}"
+    )
 
     cleaned_values = remove_outliers_iqr(values)
     removed = len(values) - len(cleaned_values)
     print(f"Удалено выбросов: {removed}")
 
-    hist_path_clean, mean_c, median_c, mode_c = plot_hist_with_statistics(cleaned_values, name, "clean")
+    hist_path_clean, mean_c, median_c, mode_c = plot_hist_with_statistics(
+        cleaned_values, name, "clean"
+    )
     print(f"Гистограмма (без выбросов) сохранена: {hist_path_clean}")
     print(f"Среднее: {mean_c:.4f}, медиана: {median_c:.4f}, мода: {mode_c:.4f}")
 
@@ -155,13 +178,17 @@ def analyze_currency(df: pd.DataFrame, name: str) -> pd.Series:
 
     tests_clean = run_normality_tests(cleaned_values)
     shapiro_stat, shapiro_p = tests_clean["shapiro"]
-    print(f"Критерий Шапиро-Уилка (без выбросов): статистика={shapiro_stat:.4f}, p-value={shapiro_p:.4f}")
+    print(
+        f"Критерий Шапиро-Уилка (без выбросов): статистика={shapiro_stat:.4f}, p-value={shapiro_p:.4f}"
+    )
     anderson_stat, anderson_table = tests_clean["anderson"]
     print(f"Критерий Андерсона-Дарлинга (без выбросов): статистика={anderson_stat:.4f}")
     for level, critical in anderson_table:
         print(f"  Уровень значимости {level:.1f}%: критическое значение {critical:.4f}")
     ks_stat, ks_p = tests_clean["kolmogorov"]
-    print(f"Критерий Колмогорова-Смирнова (без выбросов): статистика={ks_stat:.4f}, p-value={ks_p:.4f}")
+    print(
+        f"Критерий Колмогорова-Смирнова (без выбросов): статистика={ks_stat:.4f}, p-value={ks_p:.4f}"
+    )
 
     return cleaned_values
 
@@ -170,7 +197,9 @@ def analyze_correlations(data: pd.DataFrame) -> None:
     """Исследуем пары валют и сохраняем графики корреляции."""
     for left, right in combinations(data.columns, 2):
         plt.figure(figsize=(8, 6))
-        plt.scatter(data[left], data[right], color="darkorange", edgecolor="black", alpha=0.7)
+        plt.scatter(
+            data[left], data[right], color="darkorange", edgecolor="black", alpha=0.7
+        )
         plt.title(f"Диаграмма рассеяния: {left} vs {right}")
         plt.xlabel(left)
         plt.ylabel(right)
