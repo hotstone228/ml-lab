@@ -1,0 +1,18 @@
+(ml-venv-3-10) PS C:\Users\hotstone\Nextcloud\Машинное обучение\ml-lab-7sem> & C:/Users/hotstone/ml-venv-3-10/Scripts/python.exe "c:/Users/hotstone/Nextcloud/Машинное обучение/ml-lab-7sem/3/lab3.py"    
+Шаг 2: исходные данные загружены, форма: (6497, 13)
+Доступные столбцы: ['fixed acidity', 'volatile acidity', 'citric acid', 'residual sugar', 'chlorides', 'free sulfur dioxide', 'total sulfur dioxide', 'density', 'pH', 'sulphates', 'alcohol', 'quality', 'type']
+Метка класса — столбец 'quality' (оценка качества вина).
+Шаг 3: признаки подготовлены, стандартизация будет выполняться внутри конвейера по обучающим данным.
+Шаг 4: обучающая выборка: (3898, 12) тестовая выборка: (2599, 12)
+Шаг 5: лучшие параметры SVM: {'svc__C': np.float64(4.6415888336127775), 'svc__class_weight': 'balanced', 'svc__gamma': 'scale', 'svc__kernel': 'rbf', 'svc__probability': True}
+Точность (Accuracy) на обучающей выборке: 0.5469
+Сбалансированная точность на обучающей выборке: 0.7789
+Точность (Accuracy) на тестовой выборке: 0.4421
+Сбалансированная точность на тестовой выборке: 0.3599
+Шаг 6: количество главных компонент: 0.95
+Лучшие параметры SVM после PCA: {'pca__n_components': 0.99, 'svc__C': np.float64(4.6415888336127775), 'svc__class_weight': 'balanced', 'svc__gamma': np.float64(0.08333333333333333), 'svc__kernel': 'rbf', 'svc__probability': True}
+Точность (Accuracy) на обучающей выборке (PCA): 0.5446
+Сбалансированная точность на обучающей выборке (PCA): 0.7754
+Точность (Accuracy) на тестовой выборке (PCA): 0.4371
+Сбалансированная точность на тестовой выборке (PCA): 0.3594
+Шаг 7: график с предиктивным эллипсом сохранён по пути: 3\plots\lab3_predictive_ellipse.png

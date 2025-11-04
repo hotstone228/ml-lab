@@ -1,4 +1,5 @@
 """Лабораторная работа №3: классификация качества вина при помощи SVM."""
+
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -18,8 +19,9 @@ import kagglehub
 # ---------------------------------------------------------------------------
 # Шаг 1. Загрузка данных с Kaggle
 # ---------------------------------------------------------------------------
-# Скачиваем набор данных с помощью kagglehub (аналогично примеру из lab1).
-dataset_dir = Path(kagglehub.dataset_download("ehsanesmaeili/red-and-white-wine-quality-merged"))
+dataset_dir = Path(
+    kagglehub.dataset_download("ehsanesmaeili/red-and-white-wine-quality-merged")
+)
 csv_path = dataset_dir / "wine_quality_merged.csv"
 
 # ---------------------------------------------------------------------------
@@ -41,11 +43,11 @@ float_columns = [
     "pH",
     "sulphates",
     "alcohol",
+    "quality",
 ]
 
 # Гарантируем корректные типы данных.
 df_wine[float_columns] = df_wine[float_columns].astype("float64")
-df_wine["quality"] = df_wine["quality"].astype("int64")
 df_wine["type"] = df_wine["type"].astype("category")
 
 print("Шаг 2: исходные данные загружены, форма:", df_wine.shape)
@@ -53,7 +55,7 @@ print("Доступные столбцы:", list(df_wine.columns))
 print("Метка класса — столбец 'quality' (оценка качества вина).")
 
 # ---------------------------------------------------------------------------
-# Шаг 3. Подготовка признаков и стандартизация (без утечки информации)
+# Шаг 3. Подготовка признаков и стандартизация
 # ---------------------------------------------------------------------------
 # Для алгоритмов машинного обучения требуется числовое представление категориальных признаков.
 # Кодируем тип вина (красное/белое) целочисленным значением и работаем с исходными признаками.
@@ -79,48 +81,51 @@ X_train_raw, X_test_raw, y_train, y_test = train_test_split(
     stratify=y_full,
 )
 print(
-    "Шаг 4: обучающая выборка:", X_train_raw.shape, "тестовая выборка:", X_test_raw.shape
+    "Шаг 4: обучающая выборка:",
+    X_train_raw.shape,
+    "тестовая выборка:",
+    X_test_raw.shape,
 )
 
 # ---------------------------------------------------------------------------
 # Шаг 5. Обучение SVM и подбор гиперпараметров
 # ---------------------------------------------------------------------------
+n_features = X_train_raw.shape[1]
+base_gamma = 1.0 / n_features
+
 # Подбираем параметры kernel, gamma, degree, C при помощи GridSearchCV.
 svm_pipeline = Pipeline(
     [
         ("scaler", StandardScaler()),
         (
             "svc",
-            SVC(class_weight="balanced"),
+            SVC(cache_size=2000),
         ),
     ]
 )
 
 param_grid = [
-    # Логарифмическая сетка значений C для линейного ядра.
-    {"svc__kernel": ["linear"], "svc__C": [0.01, 0.1, 1.0, 10.0, 100.0]},
     {
-        "svc__kernel": ["rbf"],
-        "svc__C": [0.1, 1.0, 10.0],
-        # Комбинация стандартного значения и логарифмической сетки по gamma.
-        "svc__gamma": ["scale", 0.01, 0.1],
-    },
-    {
-        "svc__kernel": ["poly"],
-        "svc__C": [0.1, 1.0, 10.0],
-        # Для полиномиального ядра ограничиваемся устойчивыми настройками.
+        "svc__C": [np.float64(4.6415888336127775)],
+        "svc__class_weight": ["balanced"],
         "svc__gamma": ["scale"],
-        "svc__degree": [2, 3],
-        "svc__coef0": [0.0],
+        "svc__kernel": ["rbf"],
+        "svc__probability": [True],
     },
 ]
+
+scoring = {
+    "bal_acc": "balanced_accuracy",
+    "f1_macro": "f1_macro",
+    "roc_auc_ovr": "roc_auc_ovr",  # для многокласса тоже работает (One-vs-Rest)
+}
 
 cv_strategy = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
 search = GridSearchCV(
     svm_pipeline,
     param_grid=param_grid,
-    cv=cv_strategy,
-    scoring="balanced_accuracy",
+    scoring=scoring,
+    refit="bal_acc",
     n_jobs=-1,
 )
 search.fit(X_train_raw, y_train)
@@ -135,9 +140,13 @@ test_balanced_accuracy = balanced_accuracy_score(y_test, test_pred)
 
 print("Шаг 5: лучшие параметры SVM:", search.best_params_)
 print("Точность (Accuracy) на обучающей выборке:", round(train_accuracy, 4))
-print("Сбалансированная точность на обучающей выборке:", round(train_balanced_accuracy, 4))
+print(
+    "Сбалансированная точность на обучающей выборке:", round(train_balanced_accuracy, 4)
+)
 print("Точность (Accuracy) на тестовой выборке:", round(test_accuracy, 4))
-print("Сбалансированная точность на тестовой выборке:", round(test_balanced_accuracy, 4))
+print(
+    "Сбалансированная точность на тестовой выборке:", round(test_balanced_accuracy, 4)
+)
 
 # ---------------------------------------------------------------------------
 # Шаг 6. Применение PCA и повторное обучение SVM
@@ -148,23 +157,32 @@ X_train_scaled = pca_scaler.fit_transform(X_train_raw)
 pca_full = PCA(random_state=42)
 pca_full.fit(X_train_scaled)
 cumulative_variance = np.cumsum(pca_full.explained_variance_ratio_)
-required_components = int(np.searchsorted(cumulative_variance, 0.95) + 1)
-# Гарантируем минимум два компонента для последующей визуализации эллипса.
-required_components = max(2, min(required_components, X_train_raw.shape[1]))
+required_components = 0.80
 
 pca_pipeline = Pipeline(
     [
         ("scaler", StandardScaler()),
-        ("pca", PCA(n_components=required_components, random_state=42)),
-        ("svc", SVC(class_weight="balanced")),
+        ("pca", PCA(random_state=42)),
+        ("svc", SVC(cache_size=2000)),
     ]
 )
 
+pca_param_grid = [
+    {
+        "pca__n_components": [0.99],
+        "svc__C": [np.float64(4.6415888336127775)],
+        "svc__class_weight": ["balanced"],
+        "svc__gamma": [np.float64(0.08333333333333333)],
+        "svc__kernel": ["rbf"],
+        "svc__probability": [True],
+    }
+]
+
 search_pca = GridSearchCV(
     pca_pipeline,
-    param_grid=param_grid,
-    cv=cv_strategy,
-    scoring="balanced_accuracy",
+    param_grid=pca_param_grid,
+    scoring=scoring,
+    refit="bal_acc",  # выбираем лучшую модель по balanced accuracy
     n_jobs=-1,
 )
 search_pca.fit(X_train_raw, y_train)
@@ -176,6 +194,11 @@ train_accuracy_pca = accuracy_score(y_train, train_pred_pca)
 test_accuracy_pca = accuracy_score(y_test, test_pred_pca)
 train_balanced_accuracy_pca = balanced_accuracy_score(y_train, train_pred_pca)
 test_balanced_accuracy_pca = balanced_accuracy_score(y_test, test_pred_pca)
+
+# достать реальный PCA объект
+pca_step = best_svm_pca.named_steps["pca"]
+
+print("Фактическое число главных компонент:", pca_step.n_components_)
 
 print("Шаг 6: количество главных компонент:", required_components)
 print("Лучшие параметры SVM после PCA:", search_pca.best_params_)
@@ -190,10 +213,16 @@ print(
     round(test_balanced_accuracy_pca, 4),
 )
 
+
 # ---------------------------------------------------------------------------
 # Шаг 7. Построение предиктивного эллипса в пространстве двух главных компонент
 # ---------------------------------------------------------------------------
-def plot_predictive_ellipse(X_train_2d: np.ndarray, X_test_2d: np.ndarray, predictions: np.ndarray, output_path: Path) -> None:
+def plot_predictive_ellipse(
+    X_train_2d: np.ndarray,
+    X_test_2d: np.ndarray,
+    predictions: np.ndarray,
+    output_path: Path,
+) -> None:
     """Строит диаграмму рассеяния и эллипс, охватывающий 95% распределения обучающих точек."""
 
     # Среднее и ковариационная матрица по обучающему набору.
