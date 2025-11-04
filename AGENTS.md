@@ -9,3 +9,11 @@
 9. Не добавляй в коммиты большие файлы с исходными данными. Добавляй только файлы с кодом.
 10. Используй код из 1/lab.py как образец.
 11. Чем меньше проверок и косметики будет в коде, тем лучше.
+
+Пример загрузки датасета с kaggle:
+from pathlib import Path
+import kagglehub
+dataset_dir = Path(
+kagglehub.dataset_download("ehsanesmaeili/red-and-white-wine-quality-merged")
+)
+csv_path = dataset_dir / "wine_quality_merged.csv"
