@@ -93,7 +93,13 @@ X_test, X_valid, y_test, y_valid = train_test_split(
     stratify=y_temp,
 )
 
-print("Размеры выборок (обучение / тест / валидация):", X_train.shape, X_test.shape, X_valid.shape)
+print(
+    "Размеры выборок (обучение / тест / валидация):",
+    X_train.shape,
+    X_test.shape,
+    X_valid.shape,
+)
+
 
 # ---------------------------------------------------------------------------
 # Вспомогательная функция для оценки качества классификаторов
@@ -118,7 +124,7 @@ def evaluate_classifier(model, x_train, y_train, x_test, y_test, title):
         "test_roc_auc": roc_auc_score(y_test, test_scores),
     }
 
-    print(title)
+    """print(title)
     print(
         "  Точность на обучении: {:.4f}, на тесте: {:.4f}".format(
             metrics["train_accuracy"], metrics["test_accuracy"]
@@ -128,7 +134,7 @@ def evaluate_classifier(model, x_train, y_train, x_test, y_test, title):
         "  Precision: {:.4f}, Recall: {:.4f}, ROC-AUC: {:.4f}".format(
             metrics["test_precision"], metrics["test_recall"], metrics["test_roc_auc"]
         )
-    )
+    )"""
     return metrics
 
 
@@ -165,6 +171,7 @@ for criterion in criterion_options:
             best_tree_metrics = metrics
 
 print("Лучшее дерево по ROC-AUC на тестовой выборке:", best_tree_params)
+print(best_tree_metrics)
 
 # Дополнительное обучение лучшего дерева для последующих шагов
 best_tree.fit(np.vstack([X_train, X_test]), np.concatenate([y_train, y_test]))
@@ -243,6 +250,7 @@ for params in svm_options:
         best_svm_metrics = metrics
 
 print("Лучший SVM по ROC-AUC на тестовой выборке:", best_svm_params)
+print(best_svm_metrics)
 
 # Переобучаем лучший SVM на объединённых обучающей и тестовой выборках
 best_svm.fit(np.vstack([X_train, X_test]), np.concatenate([y_train, y_test]))
@@ -272,6 +280,7 @@ pca_tree_metrics = evaluate_classifier(
     y_test,
     "Дерево решений (PCA)",
 )
+print(pca_tree_metrics)
 
 pca_svm = SVC(probability=True, random_state=42, **best_svm_params)
 print("Качество SVM после PCA:")
@@ -283,6 +292,7 @@ pca_svm_metrics = evaluate_classifier(
     y_test,
     "SVM (PCA)",
 )
+print(pca_svm_metrics)
 
 # ---------------------------------------------------------------------------
 # Шаг 8. Финальная оценка на валидационной выборке
@@ -329,4 +339,3 @@ print(
     " дерево решений проще интерпретировать,"
     " а SVM обычно даёт более высокое качество при сложных границах раздела."
 )
-
