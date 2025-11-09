@@ -57,41 +57,45 @@ print("Доступные признаки:", list(df_raw.columns))
 print("Метка класса — столбец 'type' (красное или белое вино).")
 
 # ---------------------------------------------------------------------------
-# Шаг 3. Стандартизация числовых признаков
+# Шаг 3. Подготовка признаков и стандартизация (на обучающей выборке)
 # ---------------------------------------------------------------------------
 features_df = df_raw.drop(columns=["type"]).copy()
 labels_series = df_raw["type"].map({"red": 0, "white": 1}).astype("int64")
 
-scaler_full = StandardScaler()
-features_scaled = scaler_full.fit_transform(features_df.to_numpy(dtype=np.float64))
-features_scaled_df = pd.DataFrame(
-    features_scaled,
-    columns=features_df.columns,
-)
+features_array = features_df.to_numpy(dtype=np.float64)
+labels_array = labels_series.to_numpy()
 
-print("Стандартизация выполнена. Среднее по признакам (первые 5 значений):")
-print(features_scaled_df.mean().head())
-print("Стандартное отклонение (первые 5 значений):")
-print(features_scaled_df.std(ddof=0).head())
-
-# ---------------------------------------------------------------------------
-# Шаг 4. Разделение на обучающую, тестовую и валидационную выборки (5/3/2)
-# ---------------------------------------------------------------------------
-X_train, X_temp, y_train, y_temp = train_test_split(
-    features_scaled_df.to_numpy(dtype=np.float64),
-    labels_series.to_numpy(),
+X_train_raw, X_temp_raw, y_train, y_temp = train_test_split(
+    features_array,
+    labels_array,
     test_size=0.5,
     random_state=42,
-    stratify=labels_series,
+    stratify=labels_array,
 )
+# Разделяем данные заранее, чтобы не подсматривать в тестовые и валидационные примеры.
 
-X_test, X_valid, y_test, y_valid = train_test_split(
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train_raw)
+X_temp = scaler.transform(X_temp_raw)
+
+train_scaled_df = pd.DataFrame(X_train, columns=features_df.columns)
+
+print("Стандартизация выполнена (по обучающей выборке). Среднее (первые 5 значений):")
+print(train_scaled_df.mean().head())
+print("Стандартное отклонение (первые 5 значений):")
+print(train_scaled_df.std(ddof=0).head())
+
+# ---------------------------------------------------------------------------
+# Шаг 4. Формирование тестовой и валидационной выборок (соотношение 5/3/2)
+# ---------------------------------------------------------------------------
+X_valid, X_test, y_valid, y_test = train_test_split(
     X_temp,
     y_temp,
-    test_size=0.4,
+    test_size=0.6,
     random_state=42,
     stratify=y_temp,
 )
+# Первая часть (40% временной выборки) — это валидация, вторая часть (60%) — тест.
 
 print(
     "Размеры выборок (обучение / тест / валидация):",
@@ -124,17 +128,21 @@ def evaluate_classifier(model, x_train, y_train, x_test, y_test, title):
         "test_roc_auc": roc_auc_score(y_test, test_scores),
     }
 
-    """print(title)
-    print(
-        "  Точность на обучении: {:.4f}, на тесте: {:.4f}".format(
-            metrics["train_accuracy"], metrics["test_accuracy"]
-        )
-    )
-    print(
-        "  Precision: {:.4f}, Recall: {:.4f}, ROC-AUC: {:.4f}".format(
-            metrics["test_precision"], metrics["test_recall"], metrics["test_roc_auc"]
-        )
-    )"""
+    # При необходимости можно раскомментировать строки ниже, чтобы видеть
+    # качество каждой модели во время перебора параметров.
+    # print(title)
+    # print(
+    #     "  Точность на обучении: {:.4f}, на тесте: {:.4f}".format(
+    #         metrics["train_accuracy"], metrics["test_accuracy"]
+    #     )
+    # )
+    # print(
+    #     "  Precision: {:.4f}, Recall: {:.4f}, ROC-AUC: {:.4f}".format(
+    #         metrics["test_precision"],
+    #         metrics["test_recall"],
+    #         metrics["test_roc_auc"],
+    #     )
+    # )
     return metrics
 
 
@@ -297,8 +305,6 @@ print(pca_svm_metrics)
 # ---------------------------------------------------------------------------
 # Шаг 8. Финальная оценка на валидационной выборке
 # ---------------------------------------------------------------------------
-X_valid_pca = pca.transform(X_valid)
-
 valid_tree_pred = best_tree.predict(X_valid)
 valid_tree_proba = best_tree.predict_proba(X_valid)[:, 1]
 
