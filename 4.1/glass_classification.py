@@ -5,9 +5,16 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import auc
+from sklearn.metrics import f1_score
+from sklearn.metrics import roc_curve
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import label_binarize
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import plot_tree
+
+import matplotlib.pyplot as plt
 
 import kagglehub
 
@@ -90,6 +97,65 @@ print(results_df.sort_values(by=["test_accuracy", "train_accuracy"], ascending=F
 best_row = results_df.sort_values(by=["test_accuracy", "train_accuracy"], ascending=False).iloc[0]
 print("Лучшее дерево без снижения размерности:")
 print(best_row)
+
+# === Новые расчёты по качеству модели ===
+# Обучаем лучшее дерево на исходных признаках и сразу получаем прогнозы для метрик.
+best_clf = DecisionTreeClassifier(
+    criterion=best_row["criterion"],
+    ccp_alpha=best_row["alpha"],
+    random_state=42,
+)
+best_clf.fit(X_train, y_train)
+y_pred = best_clf.predict(X_test)
+print("F1 (macro) на тесте:", f1_score(y_test, y_pred, average="macro"))
+print("F1 (micro) на тесте:", f1_score(y_test, y_pred, average="micro"))
+
+# Готовим данные для много-классовой ROC-кривой (подход One-vs-Rest).
+classes = np.unique(y_train)
+y_test_bin = label_binarize(y_test, classes=classes)
+y_score = best_clf.predict_proba(X_test)
+
+fpr = {}
+tpr = {}
+roc_auc = {}
+for i, cls in enumerate(classes):
+    fpr[cls], tpr[cls], _ = roc_curve(y_test_bin[:, i], y_score[:, i])
+    roc_auc[cls] = auc(fpr[cls], tpr[cls])
+
+print("ROC-AUC по классам:")
+for cls in classes:
+    print(f"Класс {cls}: AUC = {roc_auc[cls]:.3f}")
+
+# === Новые графики ===
+# 1) Много-классовые ROC-кривые по подходу One-vs-Rest.
+plt.figure(figsize=(8, 6))
+for cls in classes:
+    plt.plot(fpr[cls], tpr[cls], label=f"Класс {cls} (AUC = {roc_auc[cls]:.2f})")
+plt.plot([0, 1], [0, 1], linestyle="--", color="gray")
+plt.xlabel("Доля ложных срабатываний")
+plt.ylabel("Доля истинных срабатываний")
+plt.title("ROC-кривые для классов стекла")
+plt.legend()
+roc_path = Path("roc_curves.png")
+plt.tight_layout()
+plt.savefig(roc_path)
+print("ROC-кривые сохранены в файл:", roc_path)
+
+# 2) Визуализация дерева решений для лучшей модели без PCA.
+plt.figure(figsize=(14, 10))
+plot_tree(
+    best_clf,
+    filled=True,
+    feature_names=feature_columns,
+    class_names=[str(cls) for cls in classes],
+    max_depth=4,
+    fontsize=8,
+)
+plt.title("Фрагмент дерева решений (первые уровни)")
+tree_path = Path("decision_tree.png")
+plt.tight_layout()
+plt.savefig(tree_path)
+print("Визуализация дерева сохранена в файл:", tree_path)
 
 # Шаг 6. PCA и построение дерева в пространстве главных компонент.
 pca = PCA()
