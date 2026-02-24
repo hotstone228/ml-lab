@@ -1,1 +1,1 @@
-# ml-lab-7sem
+# ml-lab
