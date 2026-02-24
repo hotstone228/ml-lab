@@ -1,8 +1,4 @@
-# Студенческая лабораторная работа по набору данных Yeast1
-# Задачи: загрузка данных, предобработка, разбиение, построение и настройка моделей
-
 import pandas as pd
-import numpy as np
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
@@ -316,6 +312,8 @@ best_dt_model.fit(X_train, y_train)
 print("Оригинальное лучшее DT на валид.: ")
 evaluate(best_dt_model, X_train, y_train, X_val, y_val, "DT_val")
 
+# Затем SVM: параметры могут быть с разной длиной в кортеже,
+# поэтому восстанавливаем модель условно и снова обучаем на всем train.
 best_svm_model = None
 if len(best_svm) == 3:
     best_svm_model = SVC(
@@ -339,6 +337,7 @@ best_svm_model.fit(X_train, y_train)
 print("Оригинальное лучшее SVM на валид.: ")
 evaluate(best_svm_model, X_train, y_train, X_val, y_val, "SVM_val")
 
+# И случайный лес: тот же подход, строим с найденными ранее гиперпараметрами.
 best_rf_model = RandomForestClassifier(
     criterion=best_rf[0],
     n_estimators=best_rf[1],
@@ -349,7 +348,9 @@ best_rf_model.fit(X_train, y_train)
 print("Оригинальное лучшее RF на валид.: ")
 evaluate(best_rf_model, X_train, y_train, X_val, y_val, "RF_val")
 
-# enriched best models
+# Теперь повторяем тот же финальный анализ, но для моделей, обученных
+# на обогащённых данных. Это позволяет оценить, принесло ли добавление новых
+# признаков реальную пользу. Снова начинаем с дерева решений.
 print("Обогащённое лучшее DT на валид.: ")
 best_dt_en_model = DecisionTreeClassifier(
     ccp_alpha=best_dt_e[0], criterion=best_dt_e[1], random_state=42
