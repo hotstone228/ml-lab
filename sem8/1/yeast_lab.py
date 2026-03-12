@@ -48,21 +48,21 @@ df_scaled = pd.DataFrame(X_scaled, columns=features)
 df_scaled["Class"] = df["Class"]
 
 # 4. Разбиение выборки на части для обучения и проверки.
-# Мы хотим 50% примеров на обучение, 30% на тестовую проверку гиперпараметров
-# и 20% на финальную валидацию. Это достигается последовательным разбиением:
+# Мы хотим 50% примеров на обучение, 30% на валидационную проверку гиперпараметров
+# и 20% на финальную тестовую оценку. Это достигается последовательным разбиением:
 # сперва делим пополам, потом одну из половин ещё раз (40%/60%).
 # random_state фиксирует случайность для воспроизводимости.
 train, temp = train_test_split(df_scaled, test_size=0.5, random_state=42)
-test, val = train_test_split(temp, test_size=0.4, random_state=42)
+val, test = train_test_split(temp, test_size=0.4, random_state=42)
 
 X_train = train[features].values
 y_train = train["Class"].values
-X_test = test[features].values
-y_test = test["Class"].values
 X_val = val[features].values
 y_val = val["Class"].values
+X_test = test[features].values
+y_test = test["Class"].values
 
-print("\nРазбиение: train", len(train), "test", len(test), "val", len(val))
+print("\nРазбиение: train", len(train), "val", len(val), "test", len(test))
 
 # Вспомогательная функция, которая обучает классификатор, делает предсказания
 # и вычисляет основные метрики: accuracy, precision, recall и ROC-AUC.
@@ -99,7 +99,7 @@ for alpha in alphas:
     for crit in criteria:
         desc = f"DT alpha={alpha} crit={crit}"
         clf = DecisionTreeClassifier(ccp_alpha=alpha, criterion=crit, random_state=42)
-        roc = evaluate(clf, X_train, y_train, X_test, y_test, desc)
+        roc = evaluate(clf, X_train, y_train, X_val, y_val, desc)
         if roc > best_dt_score:
             best_dt_score = roc
             best_dt = (alpha, crit, clf)
@@ -135,7 +135,7 @@ for kernel in kernels:
                             probability=True,
                             random_state=42,
                         )
-                        roc = evaluate(clf, X_train, y_train, X_test, y_test, desc)
+                        roc = evaluate(clf, X_train, y_train, X_val, y_val, desc)
                         if roc > best_svm_score:
                             best_svm_score = roc
                             best_svm = (kernel, C, gamma, degree, coef0)
@@ -146,7 +146,7 @@ for kernel in kernels:
                 clf = SVC(
                     kernel=kernel, C=C, gamma=gamma, probability=True, random_state=42
                 )
-                roc = evaluate(clf, X_train, y_train, X_test, y_test, desc)
+                roc = evaluate(clf, X_train, y_train, X_val, y_val, desc)
                 if roc > best_svm_score:
                     best_svm_score = roc
                     best_svm = (kernel, C, gamma)
@@ -172,7 +172,7 @@ for c in crit:
             clf = RandomForestClassifier(
                 criterion=c, n_estimators=n, max_features=mf, random_state=42
             )
-            roc = evaluate(clf, X_train, y_train, X_test, y_test, desc)
+            roc = evaluate(clf, X_train, y_train, X_val, y_val, desc)
             if roc > best_rf_score:
                 best_rf_score = roc
                 best_rf = (c, n, mf)
@@ -198,23 +198,23 @@ scaler2 = StandardScaler()
 X_poly_scaled = scaler2.fit_transform(df_enriched[poly_features])
 df_enriched[poly_features] = X_poly_scaled
 
-# Разбиваем обогащённый набор на train/test/val так же, как раньше,
+# Разбиваем обогащённый набор на train/val/test так же, как раньше,
 # но передаём аргумент stratify, чтобы классы были равномерно распределены.
 train_e, temp_e = train_test_split(
     df_enriched, test_size=0.5, random_state=42, stratify=df_enriched["Class"]
 )
-test_e, val_e = train_test_split(
+val_e, test_e = train_test_split(
     temp_e, test_size=0.4, random_state=42, stratify=temp_e["Class"]
 )
 
-print("Обогащённое разбиение:", len(train_e), len(test_e), len(val_e))
+print("Обогащённое разбиение:", len(train_e), len(val_e), len(test_e))
 
 X_tr_e = train_e[poly_features].values
 y_tr_e = train_e["Class"].values
-X_te_e = test_e[poly_features].values
-y_te_e = test_e["Class"].values
 X_val_e = val_e[poly_features].values
 y_val_e = val_e["Class"].values
+X_te_e = test_e[poly_features].values
+y_te_e = test_e["Class"].values
 
 # Обычно мы повторяем предыдущие циклы перебора параметров
 # с теми же значениями, но теперь на обогащённых данных.
@@ -227,7 +227,7 @@ for alpha in alphas:
     for crit in criteria:
         clf = DecisionTreeClassifier(ccp_alpha=alpha, criterion=crit, random_state=42)
         roc = evaluate(
-            clf, X_tr_e, y_tr_e, X_te_e, y_te_e, f"DT_e alpha={alpha} crit={crit}"
+            clf, X_tr_e, y_tr_e, X_val_e, y_val_e, f"DT_e alpha={alpha} crit={crit}"
         )
         if roc > best_dt_e_score:
             best_dt_e_score = roc
@@ -256,8 +256,8 @@ for kernel in kernels:
                             clf,
                             X_tr_e,
                             y_tr_e,
-                            X_te_e,
-                            y_te_e,
+                            X_val_e,
+                            y_val_e,
                             f"SVM_e ker={kernel} C={C} gamma={gamma} deg={degree} coef0={coef0}",
                         )
                         if roc > best_svm_e_score:
@@ -271,8 +271,8 @@ for kernel in kernels:
                     clf,
                     X_tr_e,
                     y_tr_e,
-                    X_te_e,
-                    y_te_e,
+                    X_val_e,
+                    y_val_e,
                     f"SVM_e ker={kernel} C={C} gamma={gamma}",
                 )
                 if roc > best_svm_e_score:
@@ -292,25 +292,25 @@ for c in rf_crit:
                 criterion=c, n_estimators=n, max_features=mf, random_state=42
             )
             roc = evaluate(
-                clf, X_tr_e, y_tr_e, X_te_e, y_te_e, f"RF_e crit={c} trees={n} mf={mf}"
+                clf, X_tr_e, y_tr_e, X_val_e, y_val_e, f"RF_e crit={c} trees={n} mf={mf}"
             )
             if roc > best_rf_e_score:
                 best_rf_e_score = roc
                 best_rf_e = (c, n, mf)
 print("Лучший обогащённый RF:", best_rf_e, best_rf_e_score)
 
-# На заключительном этапе берём лучшие модели, найденные на тестовых данных,
-# и оцениваем их на отложенной валидационной выборке. Это позволяет получить
+# На заключительном этапе берём лучшие модели, найденные на валидационных данных,
+# и оцениваем их на отложенной тестовой выборке. Это позволяет получить
 # оценки качества и выбрать итоговый алгоритм.
-print("\nФинальная оценка на валидационной выборке")
+print("\nФинальная оценка на тестовой выборке")
 
 # original best models
 best_dt_model = DecisionTreeClassifier(
     ccp_alpha=best_dt[0], criterion=best_dt[1], random_state=42
 )
 best_dt_model.fit(X_train, y_train)
-print("Оригинальное лучшее DT на валид.: ")
-evaluate(best_dt_model, X_train, y_train, X_val, y_val, "DT_val")
+print("Оригинальное лучшее DT на тесте: ")
+evaluate(best_dt_model, X_train, y_train, X_test, y_test, "DT_test")
 
 # Затем SVM: параметры могут быть с разной длиной в кортеже,
 # поэтому восстанавливаем модель условно и снова обучаем на всем train.
@@ -334,8 +334,8 @@ else:
         random_state=42,
     )
 best_svm_model.fit(X_train, y_train)
-print("Оригинальное лучшее SVM на валид.: ")
-evaluate(best_svm_model, X_train, y_train, X_val, y_val, "SVM_val")
+print("Оригинальное лучшее SVM на тесте: ")
+evaluate(best_svm_model, X_train, y_train, X_test, y_test, "SVM_test")
 
 # И случайный лес: тот же подход, строим с найденными ранее гиперпараметрами.
 best_rf_model = RandomForestClassifier(
@@ -345,20 +345,20 @@ best_rf_model = RandomForestClassifier(
     random_state=42,
 )
 best_rf_model.fit(X_train, y_train)
-print("Оригинальное лучшее RF на валид.: ")
-evaluate(best_rf_model, X_train, y_train, X_val, y_val, "RF_val")
+print("Оригинальное лучшее RF на тесте: ")
+evaluate(best_rf_model, X_train, y_train, X_test, y_test, "RF_test")
 
 # Теперь повторяем тот же финальный анализ, но для моделей, обученных
 # на обогащённых данных. Это позволяет оценить, принесло ли добавление новых
 # признаков реальную пользу. Снова начинаем с дерева решений.
-print("Обогащённое лучшее DT на валид.: ")
+print("Обогащённое лучшее DT на тесте: ")
 best_dt_en_model = DecisionTreeClassifier(
     ccp_alpha=best_dt_e[0], criterion=best_dt_e[1], random_state=42
 )
 best_dt_en_model.fit(X_tr_e, y_tr_e)
-evaluate(best_dt_en_model, X_tr_e, y_tr_e, X_val_e, y_val_e, "DT_e_val")
+evaluate(best_dt_en_model, X_tr_e, y_tr_e, X_te_e, y_te_e, "DT_e_test")
 
-print("Обогащённое лучшее SVM на валид.: ")
+print("Обогащённое лучшее SVM на тесте: ")
 best_svm_en_model = None
 if len(best_svm_e) == 3:
     best_svm_en_model = SVC(
@@ -379,9 +379,9 @@ else:
         random_state=42,
     )
 best_svm_en_model.fit(X_tr_e, y_tr_e)
-evaluate(best_svm_en_model, X_tr_e, y_tr_e, X_val_e, y_val_e, "SVM_e_val")
+evaluate(best_svm_en_model, X_tr_e, y_tr_e, X_te_e, y_te_e, "SVM_e_test")
 
-print("Обогащённое лучшее RF на валид.: ")
+print("Обогащённое лучшее RF на тесте: ")
 best_rf_en_model = RandomForestClassifier(
     criterion=best_rf_e[0],
     n_estimators=best_rf_e[1],
@@ -389,7 +389,7 @@ best_rf_en_model = RandomForestClassifier(
     random_state=42,
 )
 best_rf_en_model.fit(X_tr_e, y_tr_e)
-evaluate(best_rf_en_model, X_tr_e, y_tr_e, X_val_e, y_val_e, "RF_e_val")
+evaluate(best_rf_en_model, X_tr_e, y_tr_e, X_te_e, y_te_e, "RF_e_test")
 
 print("\nГотово.")
 
